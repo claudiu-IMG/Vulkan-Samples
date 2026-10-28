@@ -414,6 +414,18 @@ HPPSwapchain::HPPSwapchain(HPPSwapchain                               &old_swapc
 		}
 	}
 
+#if defined(VK_EXT_attachment_transform) && defined(VK_KHR_extended_flags)
+	// Images rendered with an attachment transform need VK_IMAGE_USAGE_2_ATTACHMENT_TRANSFORM_BIT_EXT. It only exists as a
+	// 64-bit usage flag, so all usage flags are given with VkImageUsageFlags2CreateInfoKHR, which replaces imageUsage
+	VkImageUsageFlags2CreateInfoKHR image_usage_flags_2{VK_STRUCTURE_TYPE_IMAGE_USAGE_FLAGS_2_CREATE_INFO_KHR};
+	if (device.is_extension_enabled(VK_EXT_ATTACHMENT_TRANSFORM_EXTENSION_NAME))
+	{
+		image_usage_flags_2.pNext = const_cast<void *>(create_info.pNext);
+		image_usage_flags_2.usage = static_cast<VkImageUsageFlags>(properties.image_usage) | VK_IMAGE_USAGE_2_ATTACHMENT_TRANSFORM_BIT_EXT;
+		create_info.pNext         = &image_usage_flags_2;
+	}
+#endif
+
 	handle = device.get_handle().createSwapchainKHR(create_info);
 
 	images = device.get_handle().getSwapchainImagesKHR(handle);

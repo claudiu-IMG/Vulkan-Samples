@@ -99,6 +99,8 @@ set(ORDER_LIST
     "compute_shaders_with_tensors"
     "tensor_image_aliasing"
     "postprocessing_with_vgf"
+    "attachment_transform"
+    "attachment_transform_api"
 
     #Performance Samples
     "swapchain_images"
