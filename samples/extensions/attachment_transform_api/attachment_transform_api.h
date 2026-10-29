@@ -38,9 +38,11 @@ class AttachmentTransformApi : public ApiVulkanSample
 	void create_pipeline();
 	void handle_rotation();
 
-	bool             pre_rotate      = true;
-	VkPipelineLayout pipeline_layout = VK_NULL_HANDLE;
-	VkPipeline       pipeline        = VK_NULL_HANDLE;
+	bool             pre_rotate       = true;
+	int8_t    		 rotate_index     = 0;
+	uint32_t 	     frame_counter    = 0;
+	VkPipelineLayout pipeline_layout  = VK_NULL_HANDLE;
+	VkPipeline       pipeline         = VK_NULL_HANDLE;
 };
 
 

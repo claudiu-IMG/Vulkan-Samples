@@ -18,8 +18,6 @@
 #include "attachment_transform_api.h"
 
 #include "common/strings.h"
-#define VK_EXT_attachment_transform 1
-#define VK_KHR_extended_flags 1
 
 
 AttachmentTransformApi::AttachmentTransformApi()
@@ -51,6 +49,8 @@ void AttachmentTransformApi::request_gpu_features(vkb::core::PhysicalDeviceC &gp
 	// clci todo The Vulakn HPP headers are not up to date so it will thrwo compile error
 	// REQUEST_REQUIRED_FEATURE(gpu, VkPhysicalDeviceAttachmentTransformFeaturesEXT, attachmentTransform);
 	// REQUEST_REQUIRED_FEATURE(gpu, VkPhysicalDeviceExtendedFlagsFeaturesKHR, extendedFlags);
+
+	//clci quary for VK_ATTACHMENT_TRANSFORM_TYPE_VERTEX_POSTPROCESSING_EXT or VK_ATTACHMENT_TRANSFORM_TYPE_RENDER_PASS_OPS_EXT
 }
 
 bool AttachmentTransformApi::prepare(const vkb::ApplicationOptions &options)
@@ -60,7 +60,23 @@ bool AttachmentTransformApi::prepare(const vkb::ApplicationOptions &options)
 		return false;
 	}
 
-	LOGI("clci prepare called");
+	VkPhysicalDeviceAttachmentTransformPropertiesEXT transform_properties{.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ATTACHMENT_TRANSFORM_PROPERTIES_EXT};
+	VkPhysicalDeviceProperties2                      properties{.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2, .pNext = &transform_properties};
+	vkGetPhysicalDeviceProperties2(get_device().get_gpu().get_handle(), &properties);
+
+	switch (transform_properties.transformType)
+{
+	case VK_ATTACHMENT_TRANSFORM_TYPE_VERTEX_POSTPROCESSING_EXT:
+		LOGI("Attachment transform type: vertex post-processing");   // rotation after the vertex shader, rasterization in natural orientation
+		break;
+	case VK_ATTACHMENT_TRANSFORM_TYPE_RENDER_PASS_OPS_EXT:
+		LOGI("Attachment transform type: render pass operations");   // rendering in logical orientation, rotation on load/store/resolve
+		break;
+	default:
+		LOGI("Attachment transform type: unknown ({})", static_cast<int>(transform_properties.transformType));
+		break;
+}
+
 	create_pipeline();
 	build_command_buffers();
 
@@ -174,9 +190,13 @@ void AttachmentTransformApi::create_pipeline()
 
 void AttachmentTransformApi::build_command_buffers()
 {
+	constexpr VkSurfaceTransformFlagBitsKHR transform_flag[] = {VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR, VK_SURFACE_TRANSFORM_ROTATE_90_BIT_KHR, VK_SURFACE_TRANSFORM_ROTATE_270_BIT_KHR};
 	// The swapchain transform rotates the logical orientation into the natural orientation of the swapchain images.
 	// Passing it as attachment transform makes the implementation apply that rotation while rendering.
-	const VkSurfaceTransformFlagBitsKHR transform = get_render_context().get_swapchain().get_transform();
+	//clci to look how to we get the info for screen rotation
+	// const VkSurfaceTransformFlagBitsKHR transform = get_render_context().get_swapchain().get_transform();
+	LOGI("clci build_command_buffers rotate_index {}", rotate_index);
+	const VkSurfaceTransformFlagBitsKHR transform = transform_flag[rotate_index];
 	VkAttachmentTransformInfoEXT        transform_info{.sType = VK_STRUCTURE_TYPE_ATTACHMENT_TRANSFORM_INFO_EXT, .transform = transform};
 
 	// Render area, viewport and scissor are in logical orientation:
@@ -185,6 +205,7 @@ void AttachmentTransformApi::build_command_buffers()
 	if (transform == VK_SURFACE_TRANSFORM_ROTATE_90_BIT_KHR || transform == VK_SURFACE_TRANSFORM_ROTATE_270_BIT_KHR)
 	{
 		std::swap(extent.width, extent.height);
+		//std::swap(extent.height, extent.width);
 	}
 	const VkRect2D   render_area{{0, 0}, extent};
 	const VkViewport viewport{0.0f, 0.0f, static_cast<float>(extent.width), static_cast<float>(extent.height), 0.0f, 1.0f};
@@ -228,15 +249,17 @@ void AttachmentTransformApi::handle_rotation()
 	const bool is_rotation = surface_capabilities.currentTransform &
 	                         (VK_SURFACE_TRANSFORM_ROTATE_90_BIT_KHR | VK_SURFACE_TRANSFORM_ROTATE_180_BIT_KHR | VK_SURFACE_TRANSFORM_ROTATE_270_BIT_KHR);
 
-	//clci todo Update the condition in order to simulate a screen rotation
-	const VkSurfaceTransformFlagBitsKHR pre_transform = pre_rotate && is_rotation ? surface_capabilities.currentTransform : VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
+	const VkSurfaceTransformFlagBitsKHR pre_transform = is_rotation ? surface_capabilities.currentTransform : VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
+	//VkSurfaceTransformFlagBitsKHR pre_transform = VK_SURFACE_TRANSFORM_ROTATE_90_BIT_KHR; //clci
 
 	// Rotations by 90 and 270 degrees change the surface extent and are handled first as a resize, which keeps the previous
 	// transform. Once the extent is up to date, or for 180 degree rotations that keep the extent, the transform is updated here.
 	const VkExtent2D &surface_extent = get_render_context().get_surface_extent();
+	LOGI("clci pre_transform {} {}", (int)pre_transform, (int)get_render_context().get_swapchain().get_transform());
 	if (pre_transform != get_render_context().get_swapchain().get_transform() &&
 	    surface_capabilities.currentExtent.width == surface_extent.width && surface_capabilities.currentExtent.height == surface_extent.height)
 	{
+		LOGI("clci handle_rotation iside if pre_transform get_render_context().get_swapchain().get_transform() {} != {}", (int)pre_transform, (int)get_render_context().get_swapchain().get_transform());
 		get_device().wait_idle();
 		// The swapchain images are created in natural orientation, i.e. with width and height swapped for 90 and 270 degree rotations
 		get_render_context().update_swapchain(surface_extent, pre_transform);
@@ -246,6 +269,8 @@ void AttachmentTransformApi::handle_rotation()
 	}
 }
 
+
+
 void AttachmentTransformApi::render(float)
 {
 	if (!prepared)
@@ -253,15 +278,14 @@ void AttachmentTransformApi::render(float)
 		return;
 	}
 
-	static bool logged_render = false;
-	if (!logged_render)
+	// Switch to the next simulated transform every frames_per_rotation frames
+	constexpr uint32_t frames_per_rotation = 20;
+	if (++frame_counter % frames_per_rotation == 0)
 	{
-		LOGI("clci render called");
-		logged_render = true;
+		rotate_index = (rotate_index + 1) % 3;
+		LOGI("clci switching to transform index {}", rotate_index);
+		rebuild_command_buffers();
 	}
-
-	//clci todo add more time based logic to update it in order to simulate a screen rotation 
-	//pre_rotate = !pre_rotate;
 
 	// Before acquiring an image, as the swapchain may be recreated
 	handle_rotation();
