@@ -1,4 +1,4 @@
-# Copyright (c) 2019-2025, Arm Limited and Contributors
+# Copyright (c) 2023-2025, Arm Limited and Contributors
 #
 # SPDX-License-Identifier: Apache-2.0
 #
@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
- 
+
 get_filename_component(FOLDER_NAME ${CMAKE_CURRENT_LIST_DIR} NAME)
 get_filename_component(PARENT_DIR ${CMAKE_CURRENT_LIST_DIR} PATH)
 get_filename_component(CATEGORY_NAME ${PARENT_DIR} NAME)
@@ -22,12 +22,12 @@ get_filename_component(CATEGORY_NAME ${PARENT_DIR} NAME)
 add_sample(
     ID ${FOLDER_NAME}
     CATEGORY ${CATEGORY_NAME}
-    AUTHOR "Khronos"
-    NAME "AttachmentTransform"
-    DESCRIPTION "Sample description"
+    AUTHOR "<<Contributor>>"
+    NAME "Attachment transform (API)"
+    DESCRIPTION "Rotate an offscreen color attachment with VK_EXT_attachment_transform"
     # Important note: Shaders are compiled offline via CMake, so all shaders
     # used by this sample need to be put here
     # The framework also supports HLSL (SHADER_FILES_HLSL) and Slang (SHADER_FILES_SLANG)
     SHADER_FILES_GLSL
         "triangle.vert"
-        "triangle.frag")    
+        "triangle.frag")

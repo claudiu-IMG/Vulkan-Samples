@@ -1,4 +1,4 @@
-/* Copyright (c) 2019-2024, Arm Limited and Contributors
+/* Copyright (c) 2024, Arm Limited and Contributors
  *
  * SPDX-License-Identifier: Apache-2.0
  *
@@ -17,25 +17,33 @@
 
 #pragma once
 
-#include "rendering/render_pipeline.h"
-#include "scene_graph/components/camera.h"
-#include "vulkan_sample.h"
-#include "scene_graph/components/perspective_camera.h"
+#include "api_vulkan_sample.h"
 
-class AttachmentTransform : public vkb::VulkanSampleC
+class AttachmentTransform : public ApiVulkanSample
 {
   public:
 	AttachmentTransform();
+	~AttachmentTransform() override;
 
-	virtual bool prepare(const vkb::ApplicationOptions &options) override;
+	bool prepare(const vkb::ApplicationOptions &options) override;
+	void request_device_extensions(std::unordered_map<std::string, vkb::RequestMode> &requested_extensions) const override;
+	void request_gpu_features(vkb::core::PhysicalDeviceC &gpu) override;
+	void setup_render_pass() override;
+	void setup_framebuffer() override;
+	void build_command_buffers() override;
+	void render(float delta_time) override;
+	void on_update_ui_overlay(vkb::Drawer &drawer) override;
 
-	virtual void update(float delta_time) override;
+  private:
+	void create_pipeline();
+	void handle_rotation();
 
-	virtual ~AttachmentTransform() = default;
-
-	private:
-	vkb::sg::Camera *camera{nullptr};
-
+	bool             pre_rotate       = true;
+	int8_t    		 rotate_index     = 0;
+	uint32_t 	     frame_counter    = 0;
+	VkPipelineLayout pipeline_layout  = VK_NULL_HANDLE;
+	VkPipeline       pipeline         = VK_NULL_HANDLE;
 };
+
 
 std::unique_ptr<vkb::VulkanSampleC> create_attachment_transform();
